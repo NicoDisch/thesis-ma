@@ -27,6 +27,8 @@ if __name__ == "__main__":
         utils_pinn.write_results(model, config, accs)
     elif config['mode']=='plot':
         #print(model(0.5,0.5))
+        model.compile()
+
         utils_pinn.plot_decision_boundary(model, 100)
     # write the result down
     end = time.time()

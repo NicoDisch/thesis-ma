@@ -55,16 +55,23 @@ def train(model,config):
             tape.watch(x_tensor)
             # Feed forward
             output = model(x_tensor, training=True)
+            border = tf.reshape(output,(N,N))
+            #print(border.shape)
             y_x = tape.gradient(output, x_tensor)
             y_xx = tape.gradient(y_x,x_tensor)
+            #function_output = tf.reshape(y_xx,(N,N))
+
+
             # y_y = tape.gradient(output, x_tensor[:,1])
             # y_yy = tape.gradient(y_y, x_tensor[:, 1])
-
+            #print(output.shape)
             # Gradient and the corresponding loss function
             loss_direct = (tf.reduce_mean(input_tensor=(y_xx + 1) ** 2)
                            # + 100*tf.square(y_x[0]-1)
-                           + tf.reduce_mean(input_tensor= tf.square(output[0, :]))
-                           + tf.reduce_mean(input_tensor=tf.square(output[-1, :]))
+                           + tf.reduce_mean(input_tensor= tf.square(border[0, 0]))
+                           + tf.reduce_mean(input_tensor=tf.square(border[-1, 0]))
+                           + tf.reduce_mean(input_tensor=tf.square(border[0, -1]))
+                           + tf.reduce_mean(input_tensor= tf.square(border[-1, -1]))
                            # + 100*tf.square(output[0]-output[-1])
                            )
         # pick optimizer
@@ -153,6 +160,7 @@ def plot_decision_boundary(model, steps=100, cmap='Paired'):
 
     ax = fig.add_subplot(projection='3d')
     ax.plot_surface(xx, yy, z, alpha=0.7)
+    #ax.contourf(xx, yy, z, alpha=0.7)
     # contourf
 
     # Get predicted labels on training data and plot

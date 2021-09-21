@@ -1,0 +1,35 @@
+###############
+# Insert preject dependent settings here
+###############
+string: 'test!'
+#####################
+### NN Specifications
+#####################
+initialiser: 'glorot'
+width: 48
+# 16 next
+depth: 3
+activation_function: 'tanh'
+pde: 'lap_f1'
+
+######################
+mode: 'plot'
+# possible: train/plot
+
+
+########################
+### Training
+########################
+learning_rate: 0.00065
+steps: 50000
+
+
+
+#########################
+### Save and Load Files
+#########################
+load_model: False
+save_path: 'schrod_soll.h5'
+# plot, run, None
+action: 'plot'
+
