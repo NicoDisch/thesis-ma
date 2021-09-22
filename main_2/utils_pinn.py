@@ -298,10 +298,11 @@ def parallel_weight_matrices(*arg):
     max_len = len(arg[0].get_weights())
     amount_mats = len(arg)
     solution = np.array([])
-    # iterate over all models
-    for i, model in enumerate(arg):
-        # iterate over the depth
-        for j in range(max_len):
+    # iterate over the depth
+    for j in range(max_len):
+        # iterate over all models
+        for i, model in enumerate(arg):
+
             if j % 2 == 0:
                 # the Weight matrices
                 try:
