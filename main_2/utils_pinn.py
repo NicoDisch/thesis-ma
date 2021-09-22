@@ -141,32 +141,182 @@ def plot_decision_boundary(model, steps=100, cmap='Paired'):
     """
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
-
     cmap = plt.get_cmap(cmap)
     #steps = 1000
     x_span = np.linspace(0, 1, steps)
     print(len(x_span))
     y_span = np.linspace(0, 1, steps)
     xx, yy = np.meshgrid(x_span, y_span)
-
     # boundary = np.outer(bounday_fct(x_span),bounday_fct(y_span))
-    #print(boundary.shape)
     # Make predictions across region of interest
-    func_values = model.predict(np.c_[xx.ravel(), yy.ravel()])#*\
-             #
+    func_values = model.predict(np.c_[xx.ravel(), yy.ravel()])
     print(func_values.shape)
     # Plot decision boundary in region of interest
     z = func_values.reshape(xx.shape)#*boundary
-
     ax = fig.add_subplot(projection='3d')
     ax.plot_surface(xx, yy, z, alpha=0.7)
     #ax.contourf(xx, yy, z, alpha=0.7)
     # contourf
-
-    # Get predicted labels on training data and plot
-    #ax.scatter(X[:,0], X[:,1], c=y, cmap=cmap, lw=0)
     plt.show()
     return fig, ax
 
 
+def fill_max_1(input_size):
+    """
+    Fills a matrix on the diagonal with the max matrix (see proof)
+    alternatively use np.kron the Kronecker product
+    :param input_size:the amount of max_arrays needed
+    :return: the Correct weight matrix for max ReLU network, where max_arr is on the diagonal
+    i.e. [max_arr,..,0],... ,[0,...,max_arr]
+    """
+    max_arr = np.array([[1, -1], [0, 1], [0, -1]])
+    matrix = np.zeros((3*input_size, 2*input_size))
+    half_length = matrix.shape[1]/2
+    for i in range(int(half_length)):
+        matrix[3*i:3*i+3, 2*i:2*i+2] = max_arr
+    return matrix.T
 
+
+def bias_1(input_size):
+    """
+    bias vector
+    :param input_size:
+    :return: returns zero vector of correct size
+    """
+    return np.zeros((3*input_size))
+
+def fill_max_2(input_size):
+    """
+    creates the 2nd matrix for max ReLU, similar to fill_max_1
+    :param input_size: amount of arrays needed
+    :return: weight matrix
+    """
+    matrix = np.zeros((input_size, 3*input_size))
+    max_array2 = np.array([1, 1, -1])
+    half_length = matrix.shape[0]
+    for i in range(int(half_length)):
+        matrix[i:i+1, 3*i:3*i+3] = max_array2
+    return matrix.T
+
+
+def bias_2(input_size):
+    """
+    bias vector for the 2nd layer, see bias_1
+    :param input_size: correct shape
+    :return: just a zero vector
+    """
+    return np.zeros(( input_size ))
+
+
+def model_init(entry_size):
+    mat_array = np.array([])
+    if entry_size == 1:
+        print('already min')
+    else:
+        in_net = tf.keras.Input(shape=(entry_size))
+        entry_size = int(entry_size/2)
+        mat_array = np.append(mat_array, [[fill_max_1(entry_size),bias_1(entry_size)],
+                                          [fill_max_2(entry_size),bias_2(entry_size)]])
+        net = layers.Dense(3*entry_size, activation="relu",bias_initializer='zeros')(in_net)
+        net = layers.Dense(entry_size,activation=lambda xy: xy,bias_initializer='zeros')(net)
+    while entry_size !=1:
+        print(entry_size)
+        entry_size = int(entry_size/2)
+        mat_array = np.append(mat_array, [[fill_max_1(entry_size), bias_1(entry_size)],
+                                          [fill_max_2(entry_size), bias_2(entry_size)]])
+        net = layers.Dense(3*entry_size, activation="relu",bias_initializer='zeros')(net)
+        net = layers.Dense(entry_size,activation=lambda xy: xy,bias_initializer='zeros')(net)
+    model_max = tf.keras.Model(in_net, net, name="min_max")
+    model_max.set_weights(mat_array)
+    return model_max
+
+
+def make_arr(model_in):
+    """
+    this function reads each input shape of a layer, and appends it to an array
+    since the models instaciated had ([None, input_size]), the first layer had to be different
+    :param model_in: put in the model
+    :return: an array, which contains layer sizes
+    """
+    arr = np.array([])
+    for i, layer in enumerate(model_in.layers):
+        if i == 0:
+            arr = np.append(arr, layer.output_shape[0][1])
+        if i > 0:
+            arr = np.append(arr, layer.output_shape[1])
+    return arr
+
+
+def paral_arr(*arg):
+    """
+    adds layer depths of multiple models into one array
+    !!! This works now if all networks have the same depth !!!
+    :param arg: multiple keras models
+    :return: an array containing layer sizes
+    """
+    for i, mod in enumerate(arg):
+        # add all arrays together
+        if i == 0:
+            arr_return = make_arr(mod)
+        else:
+            arr_return = arr_return + make_arr(mod)
+    # make sure the inputs are all integers
+    return [int(a) for a in arr_return]
+
+
+def paral_model(*arg):
+    """
+    builds a keras model, that has the correct shape for the Parallelisation of several Keras models
+    !!! Keras models need to be the same depth !!!
+    -> Pad other layers as alternative with Identity layers #TODO
+    :param arg: multiple keras models
+    :return: a Keras model that has the correct layer shapes
+    """
+    arr = paral_arr(*arg)
+    for i, layer_array in enumerate(arr):
+        if i == 0:
+            # first layer, needs inout
+            begin = tf.keras.Input(shape=(layer_array))
+        elif i == 1:
+            # chain the first layer (have at least depth 2)
+            net = layers.Dense(layer_array, activation="relu", bias_initializer='zeros')(begin)
+        else:
+            # all the other layers
+            net = layers.Dense(layer_array, activation="relu", bias_initializer='zeros')(net)
+    # return the built model
+    return tf.keras.Model(begin, net, name="parallel_model")
+
+
+def parallel_weight_matrices(*arg):
+    """
+    This is the core function to make several models in parallel.
+    This has no Keras functionality, it merely looks at the weight matrices
+    !!!Same depth needed, may also only work with MAX-ReLU models!!!
+    :param arg: several Keras models
+    :return: a solution matrix
+    """
+    max_len = len(arg[0].get_weights())
+    amount_mats = len(arg)
+    solution = np.array([])
+    # iterate over all models
+    for i, model in enumerate(arg):
+        # iterate over the depth
+        for j in range(max_len):
+            if j % 2 == 0:
+                # the Weight matrices
+                try:
+                    loc_sol1 = np.insert(loc_sol1, [model.get_weights()[j]])
+                except:
+                    loc_sol1 = model.get_weights()[j]
+                result1 = np.kron(np.eye(amount_mats, dtype=int), loc_sol1)
+            else:
+                # the bias vectors
+                try:
+                    loc_sol2 = np.insert(loc_sol2, [model.get_weights()[j]])
+                except:
+                    loc_sol2 = model.get_weights()[j]
+                result2 = np.kron(np.eye(int(amount_mats), dtype=int), loc_sol2)
+                # for some reason the bias vector gets doubled
+                result2 = result2[0]
+                solution = np.append(solution, [result1, result2])
+    return solution

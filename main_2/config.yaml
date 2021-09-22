@@ -8,7 +8,7 @@ string: 'test!'
 initialiser: 'glorot'
 width: 48
 # 16 next
-depth: 3
+depth: 5
 activation_function: 'tanh'
 pde: 'lap_f1'
 
