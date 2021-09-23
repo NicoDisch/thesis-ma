@@ -209,6 +209,12 @@ def bias_2(input_size):
 
 
 def model_init(entry_size):
+    """
+    set the model weights of a ReLU max unit with N inputs
+    !! for now entry_size == 2^n for some n, pad with zero !!
+    :param entry_size: 2^n input vector size
+    :return: returns a ReLU model, with set weights
+    """
     mat_array = np.array([])
     if entry_size == 1:
         print('already min')
@@ -287,11 +293,12 @@ def paral_model(*arg):
     return tf.keras.Model(begin, net, name="parallel_model")
 
 
-def parallel_weight_matrices(*arg):
+def parallel_weight_matrices_old(*arg):
     """
     This is the core function to make several models in parallel.
     This has no Keras functionality, it merely looks at the weight matrices
     !!!Same depth needed, may also only work with MAX-ReLU models!!!
+    !! DEPRECATED - use updated  !!
     :param arg: several Keras models
     :return: a solution matrix
     """
@@ -321,3 +328,35 @@ def parallel_weight_matrices(*arg):
                 result2 = result2[0]
                 solution = np.append(solution, [result1, result2])
     return solution
+
+
+def add_matrices_general(*arg):
+    max_len = len(arg[0].get_weights())
+    print("max length of weights:", max_len)
+    amount_mats = len(arg)
+    solution = []
+    for j in range(max_len):
+        for i, model in enumerate(arg):
+            if j % 2 == 0:
+                try:
+                    loc_sol1 = np.insert(loc_sol1, [model.get_weights()[j]])
+                except:
+                    loc_sol1 = model.get_weights()[j]
+            else:
+                try:
+                    loc_sol1 = np.insert(loc_sol1, [model.get_weights()[j]])
+                except:
+                    loc_sol1 = model.get_weights()[j]
+
+        result1 = np.kron(np.eye(amount_mats, dtype=int), loc_sol1)
+        if j % 2 != 0:
+            result1 = result1[0]
+        try:
+            solution.insert(0, result1)
+        except:
+            solution = result1
+    solution = solution[::-1]
+    return solution
+
+# add identity after testing!
+
