@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.keras import layers
 import matplotlib.pyplot as plt
-
+import scipy as sp
 
 
 def build_model(config):
@@ -14,23 +14,23 @@ def build_model(config):
         return
     encoder_input = tf.keras.Input(shape=(2))
     for i in range(nn_depth):
-        if i== 0:
+        if i == 0:
             x = layers.Dense(nn_width, activation="tanh", kernel_initializer=initializer)(encoder_input)
         else:
-            x = layers.Dense(nn_width, activation="tanh",kernel_initializer=initializer)(x)
+            x = layers.Dense(nn_width, activation="tanh", kernel_initializer=initializer)(x)
     encoder_output = layers.Dense(1)(x)
     model = tf.keras.Model(encoder_input, encoder_output, name="encoder")
     return model
 
 
-def train(model,config):
+def train(model, config):
     training_steps = config['steps']
     nn_width = config['width']
     nn_depth = config['depth']
     nn_func = config['activation_function']
     problem_setting = config['pde']
     try:
-        error_loss = np.load('error_curves/{}_{}_{}_{}.txt'.format(problem_setting,nn_width, nn_depth, nn_func))
+        error_loss = np.load('error_curves/{}_{}_{}_{}.txt'.format(problem_setting, nn_width, nn_depth, nn_func))
     except:
         error_loss = np.array([1])
     ################
@@ -55,23 +55,22 @@ def train(model,config):
             tape.watch(x_tensor)
             # Feed forward
             output = model(x_tensor, training=True)
-            border = tf.reshape(output,(N,N))
-            #print(border.shape)
+            border = tf.reshape(output, (N, N))
+            # print(border.shape)
             y_x = tape.gradient(output, x_tensor)
-            y_xx = tape.gradient(y_x,x_tensor)
-            #function_output = tf.reshape(y_xx,(N,N))
-
+            y_xx = tape.gradient(y_x, x_tensor)
+            # function_output = tf.reshape(y_xx,(N,N))
 
             # y_y = tape.gradient(output, x_tensor[:,1])
             # y_yy = tape.gradient(y_y, x_tensor[:, 1])
-            #print(output.shape)
+            # print(output.shape)
             # Gradient and the corresponding loss function
             loss_direct = (tf.reduce_mean(input_tensor=(y_xx + 1) ** 2)
                            # + 100*tf.square(y_x[0]-1)
-                           + tf.reduce_mean(input_tensor= tf.square(border[0, 0]))
+                           + tf.reduce_mean(input_tensor=tf.square(border[0, 0]))
                            + tf.reduce_mean(input_tensor=tf.square(border[-1, 0]))
                            + tf.reduce_mean(input_tensor=tf.square(border[0, -1]))
-                           + tf.reduce_mean(input_tensor= tf.square(border[-1, -1]))
+                           + tf.reduce_mean(input_tensor=tf.square(border[-1, -1]))
                            # + 100*tf.square(output[0]-output[-1])
                            )
         # pick optimizer
@@ -93,7 +92,7 @@ def train(model,config):
                 # model.save_weights('checkpoints/lap_energy_best.h5')
                 best_loss = float(loss_direct)
     print(best_loss)
-    np.save('error_curves/{}_{}_{}_{}.txt'.format(problem_setting,nn_width,nn_depth, nn_func), error_loss)
+    np.save('error_curves/{}_{}_{}_{}.txt'.format(problem_setting, nn_width, nn_depth, nn_func), error_loss)
     return best_loss, float(loss_direct)
 
 
@@ -103,7 +102,7 @@ def write_results(model, config, accuracies):
     nn_func = config['activation_function']
     problem_setting = config['pde']
     training_steps = config['steps']
-    with open('saves/{}_{}_{}_{}.txt'.format(problem_setting,nn_width,nn_depth, nn_func), 'w') as f:
+    with open('saves/{}_{}_{}_{}.txt'.format(problem_setting, nn_width, nn_depth, nn_func), 'w') as f:
         f.write("DGL: Laplace")
         f.write("\n")
         f.write("f: 1")
@@ -121,7 +120,7 @@ def write_results(model, config, accuracies):
         f.write("Last loss:" + str(accuracies[1]))
         # stepsize = 50
 
-    model.save('checkpoints2d/{}_{}_{}_{}.h5'.format(problem_setting,nn_width,nn_depth, nn_func))
+    model.save('checkpoints2d/{}_{}_{}_{}.h5'.format(problem_setting, nn_width, nn_depth, nn_func))
 
 
 def load_model(config):
@@ -129,9 +128,8 @@ def load_model(config):
     nn_depth = config['depth']
     nn_func = config['activation_function']
     problem_setting = config['pde']
-    return tf.keras.models.load_model('checkpoints2d/{}_{}_{}_{}.h5'.format(problem_setting,nn_width,nn_depth, nn_func))
-
-
+    return tf.keras.models.load_model(
+        'checkpoints2d/{}_{}_{}_{}.h5'.format(problem_setting, nn_width, nn_depth, nn_func))
 
 
 def plot_decision_boundary(model, steps=100, cmap='Paired'):
@@ -142,7 +140,7 @@ def plot_decision_boundary(model, steps=100, cmap='Paired'):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
     cmap = plt.get_cmap(cmap)
-    #steps = 1000
+    # steps = 1000
     x_span = np.linspace(0, 1, steps)
     print(len(x_span))
     y_span = np.linspace(0, 1, steps)
@@ -152,10 +150,10 @@ def plot_decision_boundary(model, steps=100, cmap='Paired'):
     func_values = model.predict(np.c_[xx.ravel(), yy.ravel()])
     print(func_values.shape)
     # Plot decision boundary in region of interest
-    z = func_values.reshape(xx.shape)#*boundary
+    z = func_values.reshape(xx.shape)  # *boundary
     ax = fig.add_subplot(projection='3d')
     ax.plot_surface(xx, yy, z, alpha=0.7)
-    #ax.contourf(xx, yy, z, alpha=0.7)
+    # ax.contourf(xx, yy, z, alpha=0.7)
     # contourf
     plt.show()
     return fig, ax
@@ -170,10 +168,10 @@ def fill_max_1(input_size):
     i.e. [max_arr,..,0],... ,[0,...,max_arr]
     """
     max_arr = np.array([[1, -1], [0, 1], [0, -1]])
-    matrix = np.zeros((3*input_size, 2*input_size))
-    half_length = matrix.shape[1]/2
+    matrix = np.zeros((3 * input_size, 2 * input_size))
+    half_length = matrix.shape[1] / 2
     for i in range(int(half_length)):
-        matrix[3*i:3*i+3, 2*i:2*i+2] = max_arr
+        matrix[3 * i:3 * i + 3, 2 * i:2 * i + 2] = max_arr
     return matrix.T
 
 
@@ -183,7 +181,8 @@ def bias_1(input_size):
     :param input_size:
     :return: returns zero vector of correct size
     """
-    return np.zeros((3*input_size))
+    return np.zeros((3 * input_size))
+
 
 def fill_max_2(input_size):
     """
@@ -191,11 +190,11 @@ def fill_max_2(input_size):
     :param input_size: amount of arrays needed
     :return: weight matrix
     """
-    matrix = np.zeros((input_size, 3*input_size))
+    matrix = np.zeros((input_size, 3 * input_size))
     max_array2 = np.array([1, 1, -1])
     half_length = matrix.shape[0]
     for i in range(int(half_length)):
-        matrix[i:i+1, 3*i:3*i+3] = max_array2
+        matrix[i:i + 1, 3 * i:3 * i + 3] = max_array2
     return matrix.T
 
 
@@ -205,7 +204,7 @@ def bias_2(input_size):
     :param input_size: correct shape
     :return: just a zero vector
     """
-    return np.zeros(( input_size ))
+    return np.zeros((input_size))
 
 
 def model_init(entry_size):
@@ -220,18 +219,18 @@ def model_init(entry_size):
         print('already min')
     else:
         in_net = tf.keras.Input(shape=(entry_size))
-        entry_size = int(entry_size/2)
-        mat_array = np.append(mat_array, [[fill_max_1(entry_size),bias_1(entry_size)],
-                                          [fill_max_2(entry_size),bias_2(entry_size)]])
-        net = layers.Dense(3*entry_size, activation="relu",bias_initializer='zeros')(in_net)
-        net = layers.Dense(entry_size,activation=lambda xy: xy,bias_initializer='zeros')(net)
-    while entry_size !=1:
-        print(entry_size)
-        entry_size = int(entry_size/2)
+        entry_size = int(entry_size / 2)
         mat_array = np.append(mat_array, [[fill_max_1(entry_size), bias_1(entry_size)],
                                           [fill_max_2(entry_size), bias_2(entry_size)]])
-        net = layers.Dense(3*entry_size, activation="relu",bias_initializer='zeros')(net)
-        net = layers.Dense(entry_size,activation=lambda xy: xy,bias_initializer='zeros')(net)
+        net = layers.Dense(3 * entry_size, activation="relu", bias_initializer='zeros')(in_net)
+        net = layers.Dense(entry_size, activation=lambda xy: xy, bias_initializer='zeros')(net)
+    while entry_size != 1:
+        print(entry_size)
+        entry_size = int(entry_size / 2)
+        mat_array = np.append(mat_array, [[fill_max_1(entry_size), bias_1(entry_size)],
+                                          [fill_max_2(entry_size), bias_2(entry_size)]])
+        net = layers.Dense(3 * entry_size, activation="relu", bias_initializer='zeros')(net)
+        net = layers.Dense(entry_size, activation=lambda xy: xy, bias_initializer='zeros')(net)
     model_max = tf.keras.Model(in_net, net, name="min_max")
     model_max.set_weights(mat_array)
     return model_max
@@ -358,5 +357,87 @@ def add_matrices_general(*arg):
     solution = solution[::-1]
     return solution
 
+
 # add identity after testing!
 
+
+### Identity
+
+def identity(dimension, depth):
+    # arr = paral_arr(*arg)
+    for i in range(depth):
+        if i == 0:
+            # print(array)
+            begin = tf.keras.Input(shape=(dimension))
+        elif i == 1:
+            net = layers.Dense(2 * dimension, activation="relu", bias_initializer='zeros')(begin)
+        elif i == depth - 1:
+            net = layers.Dense(dimension, bias_initializer='zeros')(net)
+        else:
+            net = layers.Dense(2 * dimension, activation="relu", bias_initializer='zeros')(net)
+
+    model_return = tf.keras.Model(begin, net, name="parallel_model")
+    for i, layer in enumerate(model_return.layers):
+        if i == 1:
+            mat = np.concatenate([np.eye(dimension, dtype=int), -np.eye(dimension, dtype=int)], axis=1)
+            layer.set_weights([mat, np.zeros((2 * dimension))])
+        # if i == depth
+        elif i == depth - 1:
+            # mat = np.concatenate([np.eye(dimension,dtype=int),-np.eye(dimension,dtype=int)],axis=1)
+            layer.set_weights([mat.T, np.zeros((dimension))])
+        else:
+            try:
+                layer.set_weights([np.eye(2 * dimension, dtype=int), np.zeros(2 * dimension)])
+            except:
+                print('start layer')
+        # try:
+        # print(layer.get_weights())
+        # except:
+        #  print()
+
+    return model_return
+
+
+###################################
+#### Sparse approach
+###################################
+
+def fill_max_sparse_1(input_size):
+    max_arr = np.array([[1, -1], [0, 1], [0, -1]])
+    iden = sp.sparse.eye(input_size)
+    max_sparse = sp.sparse.bsr_matrix(max_arr)
+    matrix = sp.sparse.kron(iden, max_sparse)
+    # matrix = np.kron(np.eye(input_size),max_arr)
+    # matrix = sp.sparse.bsr_matrix(matrix)
+    return matrix.T
+
+
+def fill_max_sparse_2(input_size):
+    array = sp.sparse.bsr_matrix([1, 1, -1])
+    iden = sp.sparse.eye(input_size)
+    matrix = np.kron(np.eye(input_size), array)
+    matrix = sp.sparse.kron(iden, array)
+    return matrix.T
+
+
+def para_sparse_matrices(*arg):
+    result = []
+    for mat in zip(*arg):
+        sat = sp.sparse.block_diag(mat)
+        result.append(sat)
+    return result
+
+
+def shape_to_model(dense_matrix):
+    shape_list = [a.shape for a in dense_matrix]
+    print(shape_list)
+    for i, shap in enumerate(shape_list):
+        if i == 0:
+            input_mat = tf.keras.Input(shape=(int(shap[0])))
+            net = layers.Dense(shap[1], activation="relu", bias_initializer='zeros')(input_mat)
+        else:
+            net = layers.Dense(shap[1], activation="relu", bias_initializer='zeros')(net)
+    model_matrix = tf.keras.Model(input_mat, net)
+    mat_init = [b for a in dense_matrix for b in [a.toarray(), np.zeros(a.shape[1])]]
+    model_matrix.set_weights(mat_init)
+    return model_matrix

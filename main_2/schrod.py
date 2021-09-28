@@ -3,6 +3,7 @@ import sys
 sys.path.insert(0, '../../Utilities/')
 
 import tensorflow as tf
+from keras.models import load_model
 #import tensorflow.compat.v1 as tfc
 
 import numpy as np
@@ -25,6 +26,7 @@ class PhysicsInformedNN(tf.keras.Model):
     # Initialize the class
     def __init__(self, x0, u0, v0, tb, X_f, pinn_layers, lb, ub):
         super(PhysicsInformedNN, self).__init__()
+        self.model = tf.keras.Model
         X0 = np.concatenate((x0, 0 * x0), 1)  # (x0, 0)
         X_lb = np.concatenate((0 * tb + lb[0], tb), 1)  # (lb[0], tb)
         X_ub = np.concatenate((0 * tb + ub[0], tb), 1)  # (ub[0], tb)
@@ -89,12 +91,12 @@ class PhysicsInformedNN(tf.keras.Model):
         # self.optimizer = tf.contrib.opt.ScipyOptimizerInterface(self.loss,
         #                                                         method='L-BFGS-B',
         #                                                         options={'maxiter': 50000,
-        #                                                                  'maxfun': 50000,
+        #                                                                 'maxfun': 50000,
         #                                                                  'maxcor': 50,
         #                                                                  'maxls': 50,
         #                                                                  'ftol': 1.0 * np.finfo(float).eps})
-
-        self.optimizer_Adam = tf.compat.v1.train.AdamOptimizer()
+        # learning rate = 0.001 -> jumps around
+        self.optimizer_Adam = tf.compat.v1.train.AdamOptimizer(learning_rate=0.00065)
         self.train_op_Adam = self.optimizer_Adam.minimize(self.loss)
 
         # tf session
@@ -103,6 +105,9 @@ class PhysicsInformedNN(tf.keras.Model):
 
         init = tf.compat.v1.global_variables_initializer()
         self.sess.run(init)
+
+    def call(self, inputs, *args, **kwargs):
+        return self.model(inputs)
 
     def initialize_NN(self, pinn_layers):
         weights = []
@@ -164,6 +169,7 @@ class PhysicsInformedNN(tf.keras.Model):
         print('Loss:', loss)
 
     def train(self, nIter):
+        self.save_weights('schrod_start.h5', overwrite=True)
         tf_dict = {self.x0_tf: self.x0, self.t0_tf: self.t0,
                    self.u0_tf: self.u0, self.v0_tf: self.v0,
                    self.x_lb_tf: self.x_lb, self.t_lb_tf: self.t_lb,
@@ -173,20 +179,22 @@ class PhysicsInformedNN(tf.keras.Model):
         start_time = time.time()
         for it in range(nIter):
             self.sess.run(self.train_op_Adam, tf_dict)
-            #self.save_weights('schrod_sol.tf', overwrite=True)  # , save_format='tf')
+             # , save_format='tf')
             # Print
+            best_loss = 10
             if it % 10 == 0:
-
+                #save every 100
                 elapsed = time.time() - start_time
                 loss_value = self.sess.run(self.loss, tf_dict)
                 print('It: %d, Loss: %.3e, Time: %.2f' %
                       (it, loss_value, elapsed))
                 start_time = time.time()
+                if np.abs(loss_value) < best_loss:
+                    self.save_weights('checkpoints/schrod_best.h5', overwrite=True)
+                    best_loss = np.abs(loss_value)
 
-        self.optimizer.minimize(self.sess,
-                                feed_dict=tf_dict,
-                                fetches=[self.loss],
-                                loss_callback=self.callback)
+
+        self.save_weights('schrod_final.h5', overwrite=True)
 
     def predict(self, X_star):
 
@@ -243,15 +251,24 @@ if __name__ == "__main__":
     X_f = lb + (ub - lb) * lhs(2, N_f)
 
     model = PhysicsInformedNN(x0, u0, v0, tb, X_f, layers, lb, ub)
-    #model.save_weights('easy_checkpoint')
-    #model.built=True
-    #model.load_weights('schrod_sol.h5')
-    start_time = time.time()
-    model.train(50000)
-    elapsed = time.time() - start_time
-    print('Training time: %.4f' % (elapsed))
 
-    u_pred, v_pred, f_u_pred, f_v_pred = model.predict(X_star)
+    do_train = 'train'
+    if do_train =='train':
+        start_time = time.time()
+        # approx 12k overnight
+        model.train(60)
+        #model.build(tf.shape(X_star))
+        u_pred, v_pred, f_u_pred, f_v_pred = model.predict(X_star)
+        model.save('checkpoints/my_model100', save_format='tf')
+        elapsed = time.time() - start_time
+        print('Training time: %.4f' % (elapsed))
+    else:
+        #model.built = True
+        #model.load_weights('my_model100.h5')
+        model = tf.keras.models.load_model('checkpoints/my_model100.h5')
+        u_pred, v_pred, f_u_pred, f_v_pred = model.predict(X_star)
+
+
     h_pred = np.sqrt(u_pred ** 2 + v_pred ** 2)
 
     error_u = np.linalg.norm(u_star - u_pred, 2) / np.linalg.norm(u_star, 2)
@@ -277,7 +294,7 @@ if __name__ == "__main__":
     X_ub = np.concatenate((0 * tb + ub[0], tb), 1)  # (ub[0], tb)
     X_u_train = np.vstack([X0, X_lb, X_ub])
 
-    fig, ax = plt.subplot()
+    fig, ax = plt.subplots()
     ax.axis('off')
 
     ####### Row 0: h(t,x) ##################
@@ -341,4 +358,4 @@ if __name__ == "__main__":
     ax.set_ylim([-0.1, 5.1])
     ax.set_title('$t = %.2f$' % (t[125]), fontsize=10)
 
-    # savefig('./figures/NLS')
+    fig.savefig('figures/NLS_120')
