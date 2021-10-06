@@ -441,3 +441,13 @@ def shape_to_model(dense_matrix):
     mat_init = [b for a in dense_matrix for b in [a.toarray(), np.zeros(a.shape[1])]]
     model_matrix.set_weights(mat_init)
     return model_matrix
+
+
+def set_up_max_matrix(depth):
+    result = []
+    while depth != 0:
+        result.append(fill_max_sparse_1(depth))
+        result.append(fill_max_sparse_2(depth))
+        depth = int(depth / 2)
+    return result
+
